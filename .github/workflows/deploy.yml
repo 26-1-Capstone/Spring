@@ -32,8 +32,25 @@ jobs:
           script: |
             cd ~/Spring
             git pull origin master
-            echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}" > .env.tmp
-            cat .env >> .env.tmp && mv .env.tmp .env
+            cat > .env << 'EOF'
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+            MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+            MYSQL_USER=${{ secrets.MYSQL_USER }}
+            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+            DB_URL=${{ secrets.DB_URL }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
+            KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
+            APP_QA_SEED_ENABLED=${{ secrets.APP_QA_SEED_ENABLED }}
+            EOF
             docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
             docker-compose up -d
             docker-compose ps
