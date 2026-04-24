@@ -42,6 +42,7 @@ services:
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       JWT_SECRET: ${JWT_SECRET}
       APP_QA_SEED_ENABLED: ${APP_QA_SEED_ENABLED:-false}
+      FRONTEND_URL: ${FRONTEND_URL}
     depends_on:
       db:
         condition: service_healthy
