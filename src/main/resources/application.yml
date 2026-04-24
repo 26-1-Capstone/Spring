@@ -52,3 +52,4 @@ jwt:
 app:
   qa:
     seed-enabled: true
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
