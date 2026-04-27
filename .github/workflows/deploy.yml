@@ -23,6 +23,28 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
 
+      - name: 시크릿 빈값 체크
+        run: |
+          missing=""
+          check() { [ -z "$2" ] && missing="$missing $1"; }
+          check DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}"
+          check MYSQL_ROOT_PASSWORD "${{ secrets.MYSQL_ROOT_PASSWORD }}"
+          check MYSQL_DATABASE "${{ secrets.MYSQL_DATABASE }}"
+          check MYSQL_USER "${{ secrets.MYSQL_USER }}"
+          check MYSQL_PASSWORD "${{ secrets.MYSQL_PASSWORD }}"
+          check DB_URL "${{ secrets.DB_URL }}"
+          check DB_USERNAME "${{ secrets.DB_USERNAME }}"
+          check DB_PASSWORD "${{ secrets.DB_PASSWORD }}"
+          check REDIS_HOST "${{ secrets.REDIS_HOST }}"
+          check REDIS_PORT "${{ secrets.REDIS_PORT }}"
+          check JWT_SECRET "${{ secrets.JWT_SECRET }}"
+          check FRONTEND_URL "${{ secrets.FRONTEND_URL }}"
+          if [ -n "$missing" ]; then
+            echo "❌ 누락된 시크릿:$missing"
+            exit 1
+          fi
+          echo "✅ 모든 시크릿 확인 완료"
+
       - name: EC2 배포
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -32,25 +54,25 @@ jobs:
           script: |
             cd ~/Spring
             git pull origin master
-            cat > .env << 'EOF'
-            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
-            MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-            MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
-            MYSQL_USER=${{ secrets.MYSQL_USER }}
-            MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-            DB_URL=${{ secrets.DB_URL }}
-            DB_USERNAME=${{ secrets.DB_USERNAME }}
-            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            REDIS_HOST=${{ secrets.REDIS_HOST }}
-            REDIS_PORT=${{ secrets.REDIS_PORT }}
-            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-            KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}
-            KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-            APP_QA_SEED_ENABLED=${{ secrets.APP_QA_SEED_ENABLED }}
-            EOF
+            {
+              echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}"
+              echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}"
+              echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}"
+              echo "MYSQL_USER=${{ secrets.MYSQL_USER }}"
+              echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}"
+              echo "DB_URL=${{ secrets.DB_URL }}"
+              echo "DB_USERNAME=${{ secrets.DB_USERNAME }}"
+              echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}"
+              echo "REDIS_HOST=${{ secrets.REDIS_HOST }}"
+              echo "REDIS_PORT=${{ secrets.REDIS_PORT }}"
+              echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
+              echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+              echo "KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}"
+              echo "KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}"
+              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+              echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}"
+              echo "APP_QA_SEED_ENABLED=${{ secrets.APP_QA_SEED_ENABLED }}"
+            } > .env
             docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
             docker-compose up -d
             docker-compose ps
