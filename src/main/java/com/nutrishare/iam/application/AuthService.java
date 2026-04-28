@@ -27,30 +27,39 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Refresh Token not found in storage"));
 
         Authentication authentication = tokenProvider.getAuthentication(oldRefreshToken);
-        Long memberId = parseMemberId(storedToken.getMemberId());
-        if (!String.valueOf(memberId).equals(authentication.getName()) || !accountRepository.existsById(memberId)) {
-            throw new IllegalArgumentException("Invalid Refresh Token");
-        }
+        assertStoredTokenBelongsToAuthenticatedSubject(storedToken, authentication);
 
-        // Rotation: Delete old
-        refreshTokenRepository.delete(storedToken);
+        invalidateStoredRefreshToken(storedToken);
 
-        // Create new
         String newAccessToken = tokenProvider.createAccessToken(authentication);
         String newRefreshToken = tokenProvider.createRefreshToken(authentication);
 
-        // Save new
         RefreshToken newToken = new RefreshToken(newRefreshToken, authentication.getName(), newAccessToken);
         refreshTokenRepository.save(newToken);
+        assertRefreshTokenPersisted(newRefreshToken, authentication.getName());
 
         return new TokenDto(newAccessToken, newRefreshToken);
     }
 
-    private Long parseMemberId(String memberId) {
-        try {
-            return Long.valueOf(memberId);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid Refresh Token", e);
+    private void assertStoredTokenBelongsToAuthenticatedSubject(RefreshToken storedToken, Authentication authentication) {
+        if (!storedToken.getMemberId().equals(authentication.getName())) {
+            throw new IllegalArgumentException("Refresh Token subject does not match storage");
+        }
+    }
+
+    private void invalidateStoredRefreshToken(RefreshToken storedToken) {
+        refreshTokenRepository.delete(storedToken);
+        if (refreshTokenRepository.findById(storedToken.getRefreshToken()).isPresent()) {
+            throw new IllegalStateException("Failed to invalidate refresh token");
+        }
+    }
+
+    private void assertRefreshTokenPersisted(String refreshToken, String memberId) {
+        RefreshToken persistedToken = refreshTokenRepository.findById(refreshToken)
+                .orElseThrow(() -> new IllegalStateException("Failed to persist refresh token"));
+
+        if (!persistedToken.getMemberId().equals(memberId)) {
+            throw new IllegalStateException("Persisted refresh token subject does not match authentication");
         }
     }
 }
