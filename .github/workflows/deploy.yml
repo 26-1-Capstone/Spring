@@ -15,7 +15,11 @@ jobs:
       - name: GitHub 필수 시크릿 체크
         run: |
           missing=""
-          check() { [ -z "$2" ] && missing="$missing $1"; }
+          check() {
+            if [ -z "$2" ]; then
+              missing="$missing $1"
+            fi
+          }
           check DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}"
           check DOCKER_PASSWORD "${{ secrets.DOCKER_PASSWORD }}"
           check EC2_HOST "${{ secrets.EC2_HOST }}"
