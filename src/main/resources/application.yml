@@ -53,3 +53,6 @@ app:
   qa:
     seed-enabled: true
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  oauth:
+    kakao:
+      admin-key: ${KAKAO_ADMIN_KEY:}

@@ -9,6 +9,8 @@ public interface AccountRepository {
 
     Optional<Account> findById(Long id);
 
+    Optional<Account> findByProviderAndProviderUserId(String provider, String providerUserId);
+
     boolean existsByEmail(String email);
 
     boolean existsById(Long id);

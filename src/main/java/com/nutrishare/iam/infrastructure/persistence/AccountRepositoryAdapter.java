@@ -34,6 +34,11 @@ public class AccountRepositoryAdapter implements AccountRepository {
     }
 
     @Override
+    public Optional<Account> findByProviderAndProviderUserId(String provider, String providerUserId) {
+        return jpaRepository.findByProviderAndProviderUserId(provider, providerUserId);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return jpaRepository.existsByEmail(email);
     }

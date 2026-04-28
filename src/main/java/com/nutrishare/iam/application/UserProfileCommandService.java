@@ -17,6 +17,7 @@ public class UserProfileCommandService {
 
     private final AccountRepository accountRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SocialAccountUnlinkService socialAccountUnlinkService;
 
     public void updateProfile(Long userId, String nickname, Address address) {
         Account account = accountRepository.findById(userId)
@@ -39,6 +40,7 @@ public class UserProfileCommandService {
                     }
                 });
 
+        socialAccountUnlinkService.unlink(account);
         refreshTokenRepository.deleteByMemberId(String.valueOf(userId));
         accountRepository.delete(account);
     }

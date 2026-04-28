@@ -1,7 +1,5 @@
 package com.nutrishare.iam.domain;
 
-import com.nutrishare.common.exception.DomainException;
-import com.nutrishare.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -13,7 +11,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "accounts")
+@Table(name = "accounts", uniqueConstraints = @UniqueConstraint(
+        name = "uk_accounts_provider_user_id",
+        columnNames = {"provider", "providerUserId"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
@@ -33,6 +33,12 @@ public class Account {
     @Column(nullable = false)
     private Role role;
 
+    @Column(length = 30)
+    private String provider;
+
+    @Column(length = 100)
+    private String providerUserId;
+
     @CreatedDate
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -47,8 +53,13 @@ public class Account {
     }
 
     public static Account create(String email, String nickname) {
-        // Simple domain validation could go here
         return new Account(email, nickname, Role.USER);
+    }
+
+    public static Account createSocial(String email, String nickname, String provider, String providerUserId) {
+        Account account = create(email, nickname);
+        account.updateSocialProfile(nickname, provider, providerUserId);
+        return account;
     }
 
     public void changeNickname(String newNickname) {
@@ -56,6 +67,22 @@ public class Account {
             throw new IllegalArgumentException("Nickname cannot be empty");
         }
         this.nickname = newNickname;
+    }
+
+    public void updateSocialProfile(String nickname, String provider, String providerUserId) {
+        changeNickname(nickname);
+        if (provider == null || provider.isBlank()) {
+            throw new IllegalArgumentException("Provider cannot be empty");
+        }
+        if (providerUserId == null || providerUserId.isBlank()) {
+            throw new IllegalArgumentException("Provider user ID cannot be empty");
+        }
+        this.provider = provider;
+        this.providerUserId = providerUserId;
+    }
+
+    public boolean isKakaoAccount() {
+        return "kakao".equals(provider);
     }
 
     @Embedded

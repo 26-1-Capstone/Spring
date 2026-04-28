@@ -14,6 +14,7 @@ import java.util.Map;
 public class OAuth2Attribute {
     private Map<String, Object> attributes;
     private String attributeKey;
+    private String providerUserId;
     private String email;
     private String name;
     private String picture;
@@ -25,7 +26,7 @@ public class OAuth2Attribute {
             case "google":
                 return ofGoogle(attributeKey, attributes);
             case "kakao":
-                return ofKakao("email", attributes);
+                return ofKakao(attributeKey, attributes);
             default:
                 throw new UnsupportedOperationException("Unsupported provider: " + provider);
         }
@@ -39,6 +40,7 @@ public class OAuth2Attribute {
                 .picture((String) attributes.get("picture"))
                 .attributes(attributes)
                 .attributeKey(attributeKey)
+                .providerUserId(toStringValue(attributes.get(attributeKey)))
                 .provider("google")
                 .build();
     }
@@ -55,18 +57,27 @@ public class OAuth2Attribute {
                 .picture((String) kakaoProfile.get("profile_image_url"))
                 .attributes(kakaoAccount)
                 .attributeKey(attributeKey)
+                .providerUserId(toStringValue(attributes.get(attributeKey)))
                 .provider("kakao")
                 .build();
     }
 
     public Map<String, Object> convertToMap() {
         Map<String, Object> map = new HashMap<>();
-        map.put("id", attributeKey);
+        map.put("id", providerUserId);
         map.put("key", attributeKey);
         map.put("name", name);
         map.put("email", email);
         map.put("picture", picture);
+        map.put("provider", provider);
 
         return map;
+    }
+
+    private static String toStringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return String.valueOf(value);
     }
 }

@@ -46,12 +46,21 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
     }
 
     private Account saveOrUpdate(OAuth2Attribute attributes) {
-        Account account = accountRepository.findByEmail(attributes.getEmail())
+        Account account = accountRepository
+                .findByProviderAndProviderUserId(attributes.getProvider(), attributes.getProviderUserId())
+                .or(() -> accountRepository.findByEmail(attributes.getEmail()))
                 .map(entity -> {
-                    entity.changeNickname(attributes.getName());
+                    entity.updateSocialProfile(
+                            attributes.getName(),
+                            attributes.getProvider(),
+                            attributes.getProviderUserId());
                     return entity;
                 })
-                .orElse(Account.create(attributes.getEmail(), attributes.getName()));
+                .orElse(Account.createSocial(
+                        attributes.getEmail(),
+                        attributes.getName(),
+                        attributes.getProvider(),
+                        attributes.getProviderUserId()));
 
         return accountRepository.save(account);
     }
