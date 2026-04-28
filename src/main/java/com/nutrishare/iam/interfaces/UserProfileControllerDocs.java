@@ -26,6 +26,10 @@ public interface UserProfileControllerDocs {
                         @Parameter(hidden = true) Authentication authentication,
                         @RequestBody @Valid UpdateProfileRequest request);
 
+        @Operation(summary = "회원 탈퇴", description = "로그인한 사용자의 로컬 계정을 삭제하고 저장된 리프레시 토큰을 무효화합니다.")
+        ApiResponse<Map<String, Object>> withdraw(
+                        @Parameter(hidden = true) Authentication authentication);
+
         @Operation(summary = "주문 내역 조회", description = "나의 주문 내역 목록을 조회합니다.")
         ApiResponse<List<MyPageQueryService.OrderSummaryView>> getOrderHistory(
                         @Parameter(hidden = true) Authentication authentication);

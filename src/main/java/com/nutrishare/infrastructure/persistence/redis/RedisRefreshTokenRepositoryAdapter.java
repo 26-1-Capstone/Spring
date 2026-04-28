@@ -34,4 +34,9 @@ public class RedisRefreshTokenRepositoryAdapter implements RefreshTokenRepositor
     public void delete(RefreshToken refreshToken) {
         redisRepository.deleteById(refreshToken.getRefreshToken());
     }
+
+    @Override
+    public void deleteByMemberId(String memberId) {
+        redisRepository.deleteAll(redisRepository.findAllByMemberId(memberId));
+    }
 }

@@ -1,5 +1,6 @@
 package com.nutrishare.infrastructure.configuration;
 
+import com.nutrishare.iam.domain.AccountRepository;
 import com.nutrishare.infrastructure.security.jwt.JwtAuthenticationFilter;
 import com.nutrishare.infrastructure.security.jwt.JwtTokenProvider;
 import com.nutrishare.infrastructure.security.oauth2.OAuth2SuccessHandler;
@@ -26,6 +27,7 @@ import java.util.List;
 public class SecurityConfig {
 
         private final JwtTokenProvider jwtTokenProvider;
+        private final AccountRepository accountRepository;
         private final OAuth2SuccessHandler oAuth2SuccessHandler;
         private final com.nutrishare.infrastructure.security.oauth2.CustomOAuth2UserService customOAuth2UserService;
         private final com.nutrishare.infrastructure.security.oauth2.CustomOidcUserService customOidcUserService;
@@ -60,7 +62,7 @@ public class SecurityConfig {
                                                                 "/v3/api-docs/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
-                                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
+                                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, accountRepository),
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .oauth2Login(oauth2 -> oauth2
                                                 .userInfoEndpoint(userInfo -> userInfo
