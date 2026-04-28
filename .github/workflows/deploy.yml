@@ -12,6 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: GitHub 필수 시크릿 체크
+        run: |
+          missing=""
+          check() { [ -z "$2" ] && missing="$missing $1"; }
+          check DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}"
+          check DOCKER_PASSWORD "${{ secrets.DOCKER_PASSWORD }}"
+          check EC2_HOST "${{ secrets.EC2_HOST }}"
+          check EC2_USER "${{ secrets.EC2_USER }}"
+          check EC2_KEY "${{ secrets.EC2_KEY }}"
+          if [ -n "$missing" ]; then
+            echo "❌ GitHub Actions 실행에 필요한 시크릿 누락:$missing"
+            exit 1
+          fi
+          echo "✅ GitHub Actions 필수 시크릿 확인 완료"
+
       - name: Docker Hub 로그인
         uses: docker/login-action@v3
         with:
@@ -23,29 +38,6 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest .
           docker push ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
 
-      - name: 시크릿 빈값 체크
-        run: |
-          missing=""
-          check() { [ -z "$2" ] && missing="$missing $1"; }
-          check DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}"
-          check MYSQL_ROOT_PASSWORD "${{ secrets.MYSQL_ROOT_PASSWORD }}"
-          check MYSQL_DATABASE "${{ secrets.MYSQL_DATABASE }}"
-          check MYSQL_USER "${{ secrets.MYSQL_USER }}"
-          check MYSQL_PASSWORD "${{ secrets.MYSQL_PASSWORD }}"
-          check DB_URL "${{ secrets.DB_URL }}"
-          check DB_USERNAME "${{ secrets.DB_USERNAME }}"
-          check DB_PASSWORD "${{ secrets.DB_PASSWORD }}"
-          check REDIS_HOST "${{ secrets.REDIS_HOST }}"
-          check REDIS_PORT "${{ secrets.REDIS_PORT }}"
-          check JWT_SECRET "${{ secrets.JWT_SECRET }}"
-          check FRONTEND_URL "${{ secrets.FRONTEND_URL }}"
-          check KAKAO_ADMIN_KEY "${{ secrets.KAKAO_ADMIN_KEY }}"
-          if [ -n "$missing" ]; then
-            echo "❌ 누락된 시크릿:$missing"
-            exit 1
-          fi
-          echo "✅ 모든 시크릿 확인 완료"
-
       - name: EC2 배포
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -55,26 +47,65 @@ jobs:
           script: |
             cd ~/Spring
             git pull origin master
-            {
-              echo "DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}"
-              echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}"
-              echo "MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}"
-              echo "MYSQL_USER=${{ secrets.MYSQL_USER }}"
-              echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}"
-              echo "DB_URL=${{ secrets.DB_URL }}"
-              echo "DB_USERNAME=${{ secrets.DB_USERNAME }}"
-              echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}"
-              echo "REDIS_HOST=${{ secrets.REDIS_HOST }}"
-              echo "REDIS_PORT=${{ secrets.REDIS_PORT }}"
-              echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}"
-              echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}"
-              echo "KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }}"
-              echo "KAKAO_CLIENT_SECRET=${{ secrets.KAKAO_CLIENT_SECRET }}"
-              echo "KAKAO_ADMIN_KEY=${{ secrets.KAKAO_ADMIN_KEY }}"
-              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
-              echo "FRONTEND_URL=${{ secrets.FRONTEND_URL }}"
-              echo "APP_QA_SEED_ENABLED=${{ secrets.APP_QA_SEED_ENABLED }}"
-            } > .env
+
+            old_env=.env
+            tmp_env=$(mktemp)
+            missing_runtime=""
+
+            existing_env_value() {
+              key="$1"
+              if [ -f "$old_env" ]; then
+                grep -E "^${key}=" "$old_env" | tail -n 1 | cut -d= -f2-
+              fi
+            }
+
+            write_env() {
+              key="$1"
+              incoming="$2"
+              required="${3:-optional}"
+
+              if [ -n "$incoming" ]; then
+                value="$incoming"
+                source="github-secret"
+              else
+                value=$(existing_env_value "$key")
+                source="server-env"
+              fi
+
+              if [ -z "$value" ] && [ "$required" = "required" ]; then
+                missing_runtime="$missing_runtime $key"
+              fi
+
+              printf '%s=%s\n' "$key" "$value" >> "$tmp_env"
+              echo "${key}: ${source}"
+            }
+
+            write_env DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}" required
+            write_env MYSQL_ROOT_PASSWORD "${{ secrets.MYSQL_ROOT_PASSWORD }}" required
+            write_env MYSQL_DATABASE "${{ secrets.MYSQL_DATABASE }}" required
+            write_env MYSQL_USER "${{ secrets.MYSQL_USER }}" required
+            write_env MYSQL_PASSWORD "${{ secrets.MYSQL_PASSWORD }}" required
+            write_env DB_URL "${{ secrets.DB_URL }}" required
+            write_env DB_USERNAME "${{ secrets.DB_USERNAME }}" required
+            write_env DB_PASSWORD "${{ secrets.DB_PASSWORD }}" required
+            write_env REDIS_HOST "${{ secrets.REDIS_HOST }}" required
+            write_env REDIS_PORT "${{ secrets.REDIS_PORT }}" required
+            write_env GOOGLE_CLIENT_ID "${{ secrets.GOOGLE_CLIENT_ID }}" optional
+            write_env GOOGLE_CLIENT_SECRET "${{ secrets.GOOGLE_CLIENT_SECRET }}" optional
+            write_env KAKAO_CLIENT_ID "${{ secrets.KAKAO_CLIENT_ID }}" optional
+            write_env KAKAO_CLIENT_SECRET "${{ secrets.KAKAO_CLIENT_SECRET }}" optional
+            write_env KAKAO_ADMIN_KEY "${{ secrets.KAKAO_ADMIN_KEY }}" required
+            write_env JWT_SECRET "${{ secrets.JWT_SECRET }}" required
+            write_env FRONTEND_URL "${{ secrets.FRONTEND_URL }}" required
+            write_env APP_QA_SEED_ENABLED "${{ secrets.APP_QA_SEED_ENABLED }}" optional
+
+            if [ -n "$missing_runtime" ]; then
+              echo "❌ GitHub Secret도 없고 EC2 기존 .env에도 없는 런타임 값:$missing_runtime"
+              rm -f "$tmp_env"
+              exit 1
+            fi
+
+            mv "$tmp_env" .env
             docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
             docker-compose up -d
             docker-compose ps
