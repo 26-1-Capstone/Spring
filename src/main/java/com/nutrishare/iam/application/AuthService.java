@@ -1,6 +1,7 @@
 package com.nutrishare.iam.application;
 
 import com.nutrishare.iam.application.dto.TokenDto;
+import com.nutrishare.iam.domain.AccountRepository;
 import com.nutrishare.iam.domain.RefreshToken;
 import com.nutrishare.iam.domain.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ public class AuthService {
 
     private final TokenProvider tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AccountRepository accountRepository;
 
     @Transactional
     public TokenDto reissue(String oldRefreshToken) {
@@ -25,6 +27,10 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Refresh Token not found in storage"));
 
         Authentication authentication = tokenProvider.getAuthentication(oldRefreshToken);
+        Long memberId = parseMemberId(storedToken.getMemberId());
+        if (!String.valueOf(memberId).equals(authentication.getName()) || !accountRepository.existsById(memberId)) {
+            throw new IllegalArgumentException("Invalid Refresh Token");
+        }
 
         // Rotation: Delete old
         refreshTokenRepository.delete(storedToken);
@@ -38,5 +44,13 @@ public class AuthService {
         refreshTokenRepository.save(newToken);
 
         return new TokenDto(newAccessToken, newRefreshToken);
+    }
+
+    private Long parseMemberId(String memberId) {
+        try {
+            return Long.valueOf(memberId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid Refresh Token", e);
+        }
     }
 }

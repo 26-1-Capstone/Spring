@@ -37,4 +37,14 @@ public class AccountRepositoryAdapter implements AccountRepository {
     public boolean existsByEmail(String email) {
         return jpaRepository.existsByEmail(email);
     }
+
+    @Override
+    public boolean existsById(Long id) {
+        return jpaRepository.existsById(id);
+    }
+
+    @Override
+    public void delete(Account account) {
+        jpaRepository.delete(account);
+    }
 }

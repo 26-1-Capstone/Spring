@@ -8,4 +8,6 @@ public interface RefreshTokenRepository {
     Optional<RefreshToken> findById(String refreshToken);
 
     void delete(RefreshToken refreshToken);
+
+    void deleteByMemberId(String memberId);
 }

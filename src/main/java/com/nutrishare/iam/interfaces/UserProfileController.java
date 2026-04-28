@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,6 +44,14 @@ public class UserProfileController implements UserProfileControllerDocs {
         userProfileCommandService.updateProfile(userId, request.nickname, address);
 
         return ApiResponse.success(Map.of("status", "UPDATED", "userId", userId));
+    }
+
+    @DeleteMapping
+    public ApiResponse<Map<String, Object>> withdraw(Authentication authentication) {
+        Long userId = AuthUserExtractor.getUserId(authentication);
+        userProfileCommandService.withdraw(userId);
+        SecurityContextHolder.clearContext();
+        return ApiResponse.success(Map.of("status", "WITHDRAWN", "userId", userId));
     }
 
     @GetMapping("/orders")

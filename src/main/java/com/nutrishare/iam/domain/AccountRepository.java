@@ -10,4 +10,8 @@ public interface AccountRepository {
     Optional<Account> findById(Long id);
 
     boolean existsByEmail(String email);
+
+    boolean existsById(Long id);
+
+    void delete(Account account);
 }
