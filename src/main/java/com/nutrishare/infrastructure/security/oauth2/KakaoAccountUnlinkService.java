@@ -2,6 +2,7 @@ package com.nutrishare.infrastructure.security.oauth2;
 
 import com.nutrishare.iam.application.SocialAccountUnlinkService;
 import com.nutrishare.iam.domain.Account;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -23,6 +24,7 @@ public class KakaoAccountUnlinkService implements SocialAccountUnlinkService {
     private final String adminKey;
     private final RestTemplate restTemplate;
 
+    @Autowired
     public KakaoAccountUnlinkService(
             @Value("${app.oauth.kakao.admin-key:}") String adminKey,
             RestTemplateBuilder restTemplateBuilder) {
