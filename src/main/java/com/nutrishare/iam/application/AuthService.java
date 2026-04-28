@@ -27,7 +27,7 @@ public class AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("Refresh Token not found in storage"));
 
         Authentication authentication = tokenProvider.getAuthentication(oldRefreshToken);
-        assertStoredTokenBelongsToAuthenticatedSubject(storedToken, authentication);
+        assertStoredTokenBelongsToActiveAccount(storedToken, authentication);
 
         invalidateStoredRefreshToken(storedToken);
 
@@ -41,9 +41,18 @@ public class AuthService {
         return new TokenDto(newAccessToken, newRefreshToken);
     }
 
-    private void assertStoredTokenBelongsToAuthenticatedSubject(RefreshToken storedToken, Authentication authentication) {
-        if (!storedToken.getMemberId().equals(authentication.getName())) {
-            throw new IllegalArgumentException("Refresh Token subject does not match storage");
+    private void assertStoredTokenBelongsToActiveAccount(RefreshToken storedToken, Authentication authentication) {
+        Long memberId = parseMemberId(storedToken.getMemberId());
+        if (!String.valueOf(memberId).equals(authentication.getName()) || !accountRepository.existsById(memberId)) {
+            throw new IllegalArgumentException("Invalid Refresh Token");
+        }
+    }
+
+    private Long parseMemberId(String memberId) {
+        try {
+            return Long.valueOf(memberId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid Refresh Token", e);
         }
     }
 

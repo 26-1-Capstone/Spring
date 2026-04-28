@@ -1,6 +1,7 @@
 package com.nutrishare.iam.application;
 
 import com.nutrishare.iam.application.dto.TokenDto;
+import com.nutrishare.iam.domain.AccountRepository;
 import com.nutrishare.iam.domain.RefreshToken;
 import com.nutrishare.iam.domain.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private AccountRepository accountRepository;
+
     @InjectMocks
     private AuthService authService;
 
@@ -47,13 +51,14 @@ class AuthServiceTest {
     void reissueInvalidatesOldTokenBeforePersistingAndReturningNewToken() {
         RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, MEMBER_ID, OLD_ACCESS_TOKEN);
         RefreshToken persistedNewToken = new RefreshToken(NEW_REFRESH_TOKEN, MEMBER_ID, NEW_ACCESS_TOKEN);
-        Authentication authentication = authenticationForMember();
+        Authentication authentication = authenticationForMember(MEMBER_ID);
 
         when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
         when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN))
                 .thenReturn(Optional.of(storedToken))
                 .thenReturn(Optional.empty());
         when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
+        when(accountRepository.existsById(42L)).thenReturn(true);
         when(tokenProvider.createAccessToken(authentication)).thenReturn(NEW_ACCESS_TOKEN);
         when(tokenProvider.createRefreshToken(authentication)).thenReturn(NEW_REFRESH_TOKEN);
         when(refreshTokenRepository.findById(NEW_REFRESH_TOKEN)).thenReturn(Optional.of(persistedNewToken));
@@ -63,10 +68,11 @@ class AuthServiceTest {
         assertThat(tokenDto.accessToken()).isEqualTo(NEW_ACCESS_TOKEN);
         assertThat(tokenDto.refreshToken()).isEqualTo(NEW_REFRESH_TOKEN);
 
-        InOrder inOrder = inOrder(refreshTokenRepository, tokenProvider);
+        InOrder inOrder = inOrder(refreshTokenRepository, tokenProvider, accountRepository);
         inOrder.verify(tokenProvider).validateToken(OLD_REFRESH_TOKEN);
         inOrder.verify(refreshTokenRepository).findById(OLD_REFRESH_TOKEN);
         inOrder.verify(tokenProvider).getAuthentication(OLD_REFRESH_TOKEN);
+        inOrder.verify(accountRepository).existsById(42L);
         inOrder.verify(refreshTokenRepository).delete(storedToken);
         inOrder.verify(refreshTokenRepository).findById(OLD_REFRESH_TOKEN);
         inOrder.verify(tokenProvider).createAccessToken(authentication);
@@ -76,13 +82,64 @@ class AuthServiceTest {
     }
 
     @Test
-    void reissueFailsClosedWhenRedisDeleteThrows() {
+    void reissueFailsWhenStoredRefreshTokenMemberAccountIsMissing() {
         RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, MEMBER_ID, OLD_ACCESS_TOKEN);
-        Authentication authentication = authenticationForMember();
+        Authentication authentication = authenticationForMember(MEMBER_ID);
 
         when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
         when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN)).thenReturn(Optional.of(storedToken));
         when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
+        when(accountRepository.existsById(42L)).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.reissue(OLD_REFRESH_TOKEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid Refresh Token");
+
+        verify(refreshTokenRepository, never()).delete(storedToken);
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+    }
+
+    @Test
+    void reissueFailsClosedForMalformedStoredMemberId() {
+        RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, "not-a-long", OLD_ACCESS_TOKEN);
+
+        when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
+        when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN)).thenReturn(Optional.of(storedToken));
+        when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authenticationForMember(MEMBER_ID));
+
+        assertThatThrownBy(() -> authService.reissue(OLD_REFRESH_TOKEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid Refresh Token");
+
+        verify(refreshTokenRepository, never()).delete(storedToken);
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+    }
+
+    @Test
+    void reissueRejectsRedisTokenStoredForDifferentSubject() {
+        RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, "99", OLD_ACCESS_TOKEN);
+
+        when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
+        when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN)).thenReturn(Optional.of(storedToken));
+        when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authenticationForMember(MEMBER_ID));
+
+        assertThatThrownBy(() -> authService.reissue(OLD_REFRESH_TOKEN))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Invalid Refresh Token");
+
+        verify(refreshTokenRepository, never()).delete(any(RefreshToken.class));
+        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
+    }
+
+    @Test
+    void reissueFailsClosedWhenRedisDeleteThrows() {
+        RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, MEMBER_ID, OLD_ACCESS_TOKEN);
+        Authentication authentication = authenticationForMember(MEMBER_ID);
+
+        when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
+        when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN)).thenReturn(Optional.of(storedToken));
+        when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
+        when(accountRepository.existsById(42L)).thenReturn(true);
         doThrow(new IllegalStateException("redis unavailable"))
                 .when(refreshTokenRepository).delete(storedToken);
 
@@ -98,13 +155,14 @@ class AuthServiceTest {
     @Test
     void reissueFailsClosedWhenOldTokenStillExistsAfterDelete() {
         RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, MEMBER_ID, OLD_ACCESS_TOKEN);
-        Authentication authentication = authenticationForMember();
+        Authentication authentication = authenticationForMember(MEMBER_ID);
 
         when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
         when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN))
                 .thenReturn(Optional.of(storedToken))
                 .thenReturn(Optional.of(storedToken));
         when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
+        when(accountRepository.existsById(42L)).thenReturn(true);
 
         assertThatThrownBy(() -> authService.reissue(OLD_REFRESH_TOKEN))
                 .isInstanceOf(IllegalStateException.class)
@@ -118,13 +176,14 @@ class AuthServiceTest {
     @Test
     void reissueFailsClosedWhenNewTokenCannotBeVerifiedInRedis() {
         RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, MEMBER_ID, OLD_ACCESS_TOKEN);
-        Authentication authentication = authenticationForMember();
+        Authentication authentication = authenticationForMember(MEMBER_ID);
 
         when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
         when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN))
                 .thenReturn(Optional.of(storedToken))
                 .thenReturn(Optional.empty());
         when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
+        when(accountRepository.existsById(42L)).thenReturn(true);
         when(tokenProvider.createAccessToken(authentication)).thenReturn(NEW_ACCESS_TOKEN);
         when(tokenProvider.createRefreshToken(authentication)).thenReturn(NEW_REFRESH_TOKEN);
         when(refreshTokenRepository.findById(NEW_REFRESH_TOKEN)).thenReturn(Optional.empty());
@@ -134,26 +193,9 @@ class AuthServiceTest {
                 .hasMessage("Failed to persist refresh token");
     }
 
-    @Test
-    void reissueRejectsRedisTokenStoredForDifferentSubject() {
-        RefreshToken storedToken = new RefreshToken(OLD_REFRESH_TOKEN, "99", OLD_ACCESS_TOKEN);
-        Authentication authentication = authenticationForMember();
-
-        when(tokenProvider.validateToken(OLD_REFRESH_TOKEN)).thenReturn(true);
-        when(refreshTokenRepository.findById(OLD_REFRESH_TOKEN)).thenReturn(Optional.of(storedToken));
-        when(tokenProvider.getAuthentication(OLD_REFRESH_TOKEN)).thenReturn(authentication);
-
-        assertThatThrownBy(() -> authService.reissue(OLD_REFRESH_TOKEN))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Refresh Token subject does not match storage");
-
-        verify(refreshTokenRepository, never()).delete(any(RefreshToken.class));
-        verify(refreshTokenRepository, never()).save(any(RefreshToken.class));
-    }
-
-    private Authentication authenticationForMember() {
+    private Authentication authenticationForMember(String memberId) {
         return new UsernamePasswordAuthenticationToken(
-                MEMBER_ID,
+                memberId,
                 "",
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
     }
