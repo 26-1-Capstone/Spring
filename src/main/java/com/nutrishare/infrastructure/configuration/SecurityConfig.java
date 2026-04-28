@@ -13,8 +13,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -62,6 +65,10 @@ public class SecurityConfig {
                                                                 "/v3/api-docs/**")
                                                 .permitAll()
                                                 .anyRequest().authenticated())
+                                .exceptionHandling(exception -> exception
+                                                .defaultAuthenticationEntryPointFor(
+                                                                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                                                                new AntPathRequestMatcher("/api/**")))
                                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, accountRepository),
                                                 UsernamePasswordAuthenticationFilter.class)
                                 .oauth2Login(oauth2 -> oauth2

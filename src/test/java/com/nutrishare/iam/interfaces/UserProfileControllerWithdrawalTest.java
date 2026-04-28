@@ -71,6 +71,6 @@ class UserProfileControllerWithdrawalTest {
     @Test
     void unauthenticatedDeleteIsRejected() throws Exception {
         mockMvc.perform(delete("/api/v1/users/me"))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().isUnauthorized());
     }
 }
