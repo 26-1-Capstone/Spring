@@ -86,7 +86,7 @@ jobs:
                       printf "%s", value
                     }
                   }
-                ' "$old_env"
+                ' "$old_env" || true
               fi
               return 0
             }
