@@ -48,7 +48,6 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          script_stop: true
           script: |
             cd ~/Spring || exit 1
             git fetch --prune origin master || exit 1
@@ -103,8 +102,9 @@ jobs:
                 missing_runtime="$missing_runtime $key"
               fi
 
-              printf '%s=%s\n' "$key" "$value" >> "$tmp_env"
+              printf '%s=%s\n' "$key" "$value" >> "$tmp_env" || exit 1
               echo "${key}: ${source}"
+              return 0
             }
 
             write_env DOCKER_USERNAME "${{ secrets.DOCKER_USERNAME }}" required
