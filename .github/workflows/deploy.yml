@@ -48,18 +48,45 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
+          script_stop: true
           script: |
+            set -eu
+            if (set -o pipefail) 2>/dev/null; then
+              set -o pipefail
+            fi
+
             cd ~/Spring
-            git pull origin master
+            git fetch --prune origin master
+            git checkout master
+            git reset --hard origin/master
+
+            compose() {
+              if command -v docker-compose >/dev/null 2>&1; then
+                docker-compose "$@"
+              else
+                docker compose "$@"
+              fi
+            }
 
             old_env=.env
-            tmp_env=$(mktemp)
+            tmp_env=$(mktemp .env.XXXXXX)
             missing_runtime=""
+            trap 'rm -f "$tmp_env"' EXIT
 
             existing_env_value() {
               key="$1"
               if [ -f "$old_env" ]; then
-                grep -E "^${key}=" "$old_env" | tail -n 1 | cut -d= -f2-
+                awk -v key="$key" '
+                  index($0, key "=") == 1 {
+                    value = substr($0, length(key) + 2)
+                    found = 1
+                  }
+                  END {
+                    if (found) {
+                      printf "%s", value
+                    }
+                  }
+                ' "$old_env"
               fi
             }
 
@@ -76,7 +103,7 @@ jobs:
                 source="server-env"
               fi
 
-              if [ -z "$value" ] && [ "$required" = "required" ]; then
+              if [ -z "$(printf '%s' "$value" | tr -d '[:space:]')" ] && [ "$required" = "required" ]; then
                 missing_runtime="$missing_runtime $key"
               fi
 
@@ -110,6 +137,11 @@ jobs:
             fi
 
             mv "$tmp_env" .env
+            trap - EXIT
+
+            compose config >/dev/null
             docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
-            docker-compose up -d
-            docker-compose ps
+            compose up -d --force-recreate app
+            compose exec -T app sh -lc 'test -n "${KAKAO_ADMIN_KEY:-}"'
+            echo "✅ KAKAO_ADMIN_KEY injected into app container"
+            compose ps
