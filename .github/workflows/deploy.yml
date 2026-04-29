@@ -50,15 +50,10 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script_stop: true
           script: |
-            set -eu
-            if (set -o pipefail) 2>/dev/null; then
-              set -o pipefail
-            fi
-
-            cd ~/Spring
-            git fetch --prune origin master
-            git checkout master
-            git reset --hard origin/master
+            cd ~/Spring || exit 1
+            git fetch --prune origin master || exit 1
+            git checkout master || exit 1
+            git reset --hard origin/master || exit 1
 
             compose() {
               if command -v docker-compose >/dev/null 2>&1; then
@@ -140,9 +135,9 @@ jobs:
             mv "$tmp_env" .env
             trap - EXIT
 
-            compose config >/dev/null
-            docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest
-            compose up -d --force-recreate app
-            compose exec -T app sh -lc 'test -n "${KAKAO_ADMIN_KEY:-}"'
+            compose config >/dev/null || exit 1
+            docker pull ${{ secrets.DOCKER_USERNAME }}/nutrishare:latest || exit 1
+            compose up -d --force-recreate app || exit 1
+            compose exec -T app sh -lc 'test -n "${KAKAO_ADMIN_KEY:-}"' || exit 1
             echo "✅ KAKAO_ADMIN_KEY injected into app container"
-            compose ps
+            compose ps || exit 1
